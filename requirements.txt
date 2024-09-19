@@ -1,0 +1,2 @@
+requests
+jsonapi_client
