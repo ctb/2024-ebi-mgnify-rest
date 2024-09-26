@@ -1,6 +1,8 @@
 #! /usr/bin/env python
 import sys
 import argparse
+import os
+from pickle import dump, load
 
 from jsonapi_client import Session as APISession
 from jsonapi_client import Modifier
@@ -10,7 +12,7 @@ import pandas as pd
 from functools import reduce
 from collections import defaultdict
 
-TEST=True
+TEST=False
 
 
 def get_all_biome_names():
@@ -82,6 +84,21 @@ def get_run_info_for_runs(run_urls):
     return zz
 
 
+def read_pickle(filename):
+    if os.path.exists(filename):
+        print(f"reading from '{filename}'")
+        with open(filename, 'rb') as fp:
+            x = load(fp)
+            return x
+
+    return None
+
+
+def save_pickle(x, filename):
+    with open(filename, 'wb') as fp:
+        dump(x, fp)
+
+
 def main():
     p = argparse.ArgumentParser()
     args = p.parse_args()
@@ -89,11 +106,16 @@ def main():
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_colwidth', None)
 
-    z = get_all_biome_names()
+    # does it exist? if so, read. if not, grab, then save.
+    biome_filename = '1-biomes.pickle'
+    z = read_pickle(biome_filename)
+    if not z:
+        z = get_all_biome_names()
+        save_pickle(z, biome_filename)
+
     all_biomes=[]
     for result in z:
         data = result['data']
-        #print(data)
         for record in data:
             biome_name = record['id']
             sample_count = record['attributes']['samples-count']
@@ -113,15 +135,20 @@ def main():
 
     all_biomes[:50]
 
-    samples_by_biome = {}
-    for n, (biome_name, count) in enumerate(all_biomes):
-        if TEST and n > 10:
-            print(f'TEST MODE stopping at {n} biomes for testing purposes')
-            break
+    biome_samples_filename = '2-biome-samples.pickle'
+    samples_by_biome = read_pickle(biome_samples_filename)
+    if not samples_by_biome:
+        samples_by_biome = {}
+        for n, (biome_name, count) in enumerate(all_biomes):
+            if TEST and n > 10:
+                print(f'TEST MODE stopping at {n} biomes for testing purposes')
+                break
 
-        print(f"getting: {biome_name} ({n + 1} of {len(all_biomes)})")
-        samples_by_biome[biome_name] = get_samples_for_biome(biome_name)
-        print(f"got: {len(samples_by_biome[biome_name])}")
+            print(f"getting: {biome_name} ({n + 1} of {len(all_biomes)})")
+            samples_by_biome[biome_name] = get_samples_for_biome(biome_name)
+            print(f"got: {len(samples_by_biome[biome_name])}")
+
+        save_pickle(samples_by_biome, biome_samples_filename)
 
 
     runs_by_biome = defaultdict(list)
@@ -129,11 +156,16 @@ def main():
         zz = get_runs_from_samples(samples_vv)
         runs_by_biome[biome_name].extend(zz)
 
-    runinfo_by_biome = {}
-    for biome_name, runlist in runs_by_biome.items():
-        print(f"working on {biome_name} - {len(runlist)} runs")
-        zz = get_run_info_for_runs(runlist)
-        runinfo_by_biome[biome_name] = zz
+    runinfo_by_biome_filename = '3-runinfo-by-biome.pickle'
+    runinfo_by_biome = read_pickle(runinfo_by_biome_filename)
+    if not runinfo_by_biome:
+        runinfo_by_biome = {}
+        for biome_name, runlist in runs_by_biome.items():
+            print(f"working on {biome_name} - {len(runlist)} runs")
+            zz = get_run_info_for_runs(runlist)
+            runinfo_by_biome[biome_name] = zz
+
+        save_pickle(runinfo_by_biome, runinfo_by_biome_filename)
 
     for biome_name, run_info in runinfo_by_biome.items():
         for n, ri in enumerate(run_info):
