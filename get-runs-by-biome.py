@@ -96,6 +96,7 @@ def read_pickle(filename):
 
 def save_pickle(x, filename):
     with open(filename, 'wb') as fp:
+        print(f"writing to '{filename}'")
         dump(x, fp)
 
 
