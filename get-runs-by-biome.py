@@ -12,7 +12,7 @@ import pandas as pd
 from functools import reduce
 from collections import defaultdict
 
-TEST=False
+TEST=True
 
 
 def get_all_biome_names():
@@ -106,21 +106,25 @@ def main():
     pd.set_option('display.max_columns', None)
     pd.set_option('display.max_colwidth', None)
 
+    ##
+    ## First get a list of all the biomes.
+    ##
+
     # does it exist? if so, read. if not, grab, then save.
     biome_filename = '1-biomes.pickle'
-    z = read_pickle(biome_filename)
-    if not z:
-        z = get_all_biome_names()
-        save_pickle(z, biome_filename)
+    biome_json = read_pickle(biome_filename)
+    if not biome_json:
+        biome_json = get_all_biome_names()
+        save_pickle(biome_json, biome_filename)
 
-    all_biomes=[]
-    for result in z:
-        data = result['data']
-        for record in data:
+    all_biomes = []
+    for result in biome_json:
+        for record in result['data']:
             biome_name = record['id']
             sample_count = record['attributes']['samples-count']
             all_biomes.append((biome_name, sample_count))
 
+    # sort and filter
     all_biomes.sort(key=lambda x: x[1])
     print("all:", len(all_biomes))
     all_biomes = [ (x, y) for (x, y) in all_biomes if y > 0 ]
@@ -130,42 +134,58 @@ def main():
     all_biomes = [ (x, y) for (x, y) in all_biomes if y >= 50 ]
     print("50-filtered:", len(all_biomes))
 
+    # select only biomes that have four parts
     all_biomes = [ (x, y) for (x, y) in all_biomes if x.count(':') == 3 ]
     print("hierarchy filtered:", len(all_biomes))
 
-    all_biomes[:50]
+    ##
+    ## Then, for each biome, get a list of associated samples.
+    ##
 
     biome_samples_filename = '2-biome-samples.pickle'
     samples_by_biome = read_pickle(biome_samples_filename)
     if not samples_by_biome:
         samples_by_biome = {}
-        for n, (biome_name, count) in enumerate(all_biomes):
-            if TEST and n > 10:
-                print(f'TEST MODE stopping at {n} biomes for testing purposes')
-                break
 
+    for n, (biome_name, count) in enumerate(all_biomes):
+        if TEST and n > 10:
+            print(f'TEST MODE stopping at {n} biomes for testing purposes')
+            break
+
+        if biome_name not in samples_by_biome:
             print(f"getting: {biome_name} ({n + 1} of {len(all_biomes)})")
             samples_by_biome[biome_name] = get_samples_for_biome(biome_name)
             print(f"got: {len(samples_by_biome[biome_name])}")
 
-        save_pickle(samples_by_biome, biome_samples_filename)
+            # save each time!
+            save_pickle(samples_by_biome, biome_samples_filename)
 
+    ##
+    ## Extract the list of runs from each biome (no web request needed)
+    ##
 
     runs_by_biome = defaultdict(list)
     for biome_name, samples_vv in samples_by_biome.items():
-        zz = get_runs_from_samples(samples_vv)
-        runs_by_biome[biome_name].extend(zz)
+        runs = get_runs_from_samples(samples_vv)
+        runs_by_biome[biome_name].extend(runs)
 
     runinfo_by_biome_filename = '3-runinfo-by-biome.pickle'
     runinfo_by_biome = read_pickle(runinfo_by_biome_filename)
     if not runinfo_by_biome:
         runinfo_by_biome = {}
-        for biome_name, runlist in runs_by_biome.items():
+
+    for biome_name, runlist in runs_by_biome.items():
+        if biome_name not in runinfo_by_biome:
             print(f"working on {biome_name} - {len(runlist)} runs")
             zz = get_run_info_for_runs(runlist)
             runinfo_by_biome[biome_name] = zz
 
-        save_pickle(runinfo_by_biome, runinfo_by_biome_filename)
+            # again, save each round!
+            save_pickle(runinfo_by_biome, runinfo_by_biome_filename)
+
+    ##
+    ## For each biome, now parse out the information. No Web requests needed.
+    ##
 
     for biome_name, run_info in runinfo_by_biome.items():
         for n, ri in enumerate(run_info):
