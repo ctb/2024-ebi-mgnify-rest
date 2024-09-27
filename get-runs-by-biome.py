@@ -12,7 +12,7 @@ import pandas as pd
 from functools import reduce
 from collections import defaultdict
 
-TEST=True
+TEST=False
 
 
 def get_all_biome_names():
@@ -129,10 +129,10 @@ def main():
     print("all:", len(all_biomes))
     all_biomes = [ (x, y) for (x, y) in all_biomes if y > 0 ]
     print("0-filtered:", len(all_biomes))
-    all_biomes = [ (x, y) for (x, y) in all_biomes if y >= 10 ]
-    print("10-filtered:", len(all_biomes))
-    all_biomes = [ (x, y) for (x, y) in all_biomes if y >= 50 ]
-    print("50-filtered:", len(all_biomes))
+    #all_biomes = [ (x, y) for (x, y) in all_biomes if y >= 10 ]
+    #print("10-filtered:", len(all_biomes))
+    #all_biomes = [ (x, y) for (x, y) in all_biomes if y >= 50 ]
+    #print("50-filtered:", len(all_biomes))
 
     # select only biomes that have four parts
     all_biomes = [ (x, y) for (x, y) in all_biomes if x.count(':') == 3 ]
