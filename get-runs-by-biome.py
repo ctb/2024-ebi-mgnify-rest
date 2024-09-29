@@ -76,7 +76,7 @@ def get_run_info_for_runs(run_urls):
         if num_pages == 1:
             zz.append(result)
         else:
-            for page in range(1, num_pages + 1):
+            for page in range(1, num_pages + 1): # probably duplicate pg 1 @CTB
                 print(f'working on page: {page} of {num_pages} for run URL {run_url}')        
                 r = requests.get(run_url + f"?page={page}")
                 zz.append(r.json)
@@ -175,10 +175,14 @@ def main():
     if not runinfo_by_biome:
         runinfo_by_biome = {}
 
+    del runinfo_by_biome['root:Environmental:Aquatic:Lentic']
+
     for n, (biome_name, runlist) in enumerate(runs_by_biome.items()):
         if biome_name not in runinfo_by_biome:
             if len(runlist) > 200 and SKIP_BIG_RUNLISTS:
-                continue        # CTB SKIP BIG
+                print(f'SKIPPING runlist for {biome_name}: {len(runlist)} runs is too many for now.')
+                continue        # CTB SKIP BIG => outer loop.
+
             print(f"working on {biome_name} - {len(runlist)} runs")
             zz = get_run_info_for_runs(runlist)
             runinfo_by_biome[biome_name] = zz
@@ -197,7 +201,7 @@ def main():
                     attr = item.get('attributes')
                     print(biome_name, attr['accession'], attr['experiment-type'], attr['instrument-platform'], attr['instrument-model'])
             except TypeError:
-                print(f'ERROR: biome {biome_name}, entry {n}')
+                print(f'ERROR: biome {biome_name}, {n} entries')
                 raise
 
 
