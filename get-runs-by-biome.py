@@ -13,7 +13,7 @@ from functools import reduce
 from collections import defaultdict
 
 TEST=False
-
+SKIP_BIG_RUNLISTS = True
 
 def get_all_biome_names():
     endpoint_name='biomes'
@@ -175,8 +175,10 @@ def main():
     if not runinfo_by_biome:
         runinfo_by_biome = {}
 
-    for biome_name, runlist in runs_by_biome.items():
+    for n, (biome_name, runlist) in enumerate(runs_by_biome.items()):
         if biome_name not in runinfo_by_biome:
+            if len(runlist) > 200 and SKIP_BIG_RUNLISTS:
+                continue        # CTB SKIP BIG
             print(f"working on {biome_name} - {len(runlist)} runs")
             zz = get_run_info_for_runs(runlist)
             runinfo_by_biome[biome_name] = zz
