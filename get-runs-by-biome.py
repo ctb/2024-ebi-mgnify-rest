@@ -65,7 +65,6 @@ def get_runs_from_samples(samples_data):
 def get_run_info_for_runs(run_urls):
     zz = []
     for n, run_url in enumerate(run_urls):
-        print(f"{n + 1} of {len(run_urls)}")
         if TEST and n > 1:
             print('TEST MODE: exiting after 2 run info retrievals.')
             break
@@ -79,7 +78,7 @@ def get_run_info_for_runs(run_urls):
             for page in range(1, num_pages + 1): # probably duplicate pg 1 @CTB
                 print(f'working on page: {page} of {num_pages} for run URL {run_url}')        
                 r = requests.get(run_url + f"?page={page}")
-                zz.append(r.json)
+                zz.append(r.json())
 
     return zz
 
@@ -170,40 +169,69 @@ def main():
         runs = get_runs_from_samples(samples_vv)
         runs_by_biome[biome_name].extend(runs)
 
-    runinfo_by_biome_filename = '3-runinfo-by-biome.pickle'
-    runinfo_by_biome = read_pickle(runinfo_by_biome_filename)
-    if not runinfo_by_biome:
-        runinfo_by_biome = {}
+    if 1:
+        runs_by_sample_filename = '3b-runs_by_sample.pickle'
+        runs_by_sample = read_pickle(runs_by_sample_filename)
+        if not runs_by_sample:
+            runs_by_sample = defaultdict(list)
 
-    del runinfo_by_biome['root:Environmental:Aquatic:Lentic']
+        remaining_urls = []
+        total_urls = 0
+        for n, (biome_name, runlist) in enumerate(runs_by_biome.items()):
+            for sample_url in runlist:
+                total_urls += 1
+                if sample_url not in runs_by_sample:
+                    remaining_urls.append(sample_url)
 
-    for n, (biome_name, runlist) in enumerate(runs_by_biome.items()):
-        if biome_name not in runinfo_by_biome:
-            if len(runlist) > 200 and SKIP_BIG_RUNLISTS:
-                print(f'SKIPPING runlist for {biome_name}: {len(runlist)} runs is too many for now.')
-                continue        # CTB SKIP BIG => outer loop.
+        for m, sample_url in enumerate(remaining_urls):
+            zz = get_run_info_for_runs([sample_url])
+            runs_by_sample[sample_url] = zz
 
-            print(f"working on {biome_name} - {len(runlist)} runs")
-            zz = get_run_info_for_runs(runlist)
-            runinfo_by_biome[biome_name] = zz
+            if m and m % 50 == 0:
+                print(f"runinfo: {m} of {len(remaining_urls)} remaining ({total_urls} total).")
+                save_pickle(runs_by_sample, runs_by_sample_filename)
 
-            # again, save each round!
-            save_pickle(runinfo_by_biome, runinfo_by_biome_filename)
 
-    ##
-    ## For each biome, now parse out the information. No Web requests needed.
-    ##
+                    
+    elif 0:
+        runinfo_by_biome_filename = '3-runinfo-by-biome.pickle'
+        runinfo_by_biome = read_pickle(runinfo_by_biome_filename)
+        if not runinfo_by_biome:
+            runinfo_by_biome = {}
 
-    for biome_name, run_info in runinfo_by_biome.items():
-        for n, ri in enumerate(run_info):
-            try:
-                for item in ri['data']:
-                    attr = item.get('attributes')
-                    print(biome_name, attr['accession'], attr['experiment-type'], attr['instrument-platform'], attr['instrument-model'])
-            except TypeError:
-                print(f'ERROR: biome {biome_name}, {n} entries')
-                raise
+        for n, (biome_name, runlist) in enumerate(runs_by_biome.items()):
+            if biome_name not in runinfo_by_biome:
+                if len(runlist) > 200 and SKIP_BIG_RUNLISTS:
+                    print(runlist[:3])
+                    print(f'SKIPPING runlist for {biome_name}: {len(runlist)} runs is too many for now.')
+                    continue        # CTB SKIP BIG => outer loop.
 
+                print(f"working on {biome_name} - {len(runlist)} runs")
+                zz = get_run_info_for_runs(runlist)
+                runinfo_by_biome[biome_name] = zz
+
+                # again, save each round!
+                save_pickle(runinfo_by_biome, runinfo_by_biome_filename)
+
+        ##
+        ## For each biome, now parse out the information. No Web requests needed.
+        ##
+
+        delme = set()
+        for biome_name, run_info in runinfo_by_biome.items():
+            for n, ri in enumerate(run_info):
+                try:
+                    for item in ri['data']:
+                        attr = item.get('attributes')
+                        #print(biome_name, attr['accession'], attr['experiment-type'], attr['instrument-platform'], attr['instrument-model'])
+                except TypeError:
+                    print(f'ERROR: biome {biome_name}, {n} entries')
+                    delme.add(biome_name)
+
+        #for name in delme:
+        #    del runinfo_by_biome[name]
+
+        #save_pickle(runinfo_by_biome, runinfo_by_biome_filename)
 
 if __name__ == '__main__':
     sys.exit(main())
