@@ -169,69 +169,48 @@ def main():
         runs = get_runs_from_samples(samples_vv)
         runs_by_biome[biome_name].extend(runs)
 
-    if 1:
-        runs_by_sample_filename = '3b-runs_by_sample.pickle'
-        runs_by_sample = read_pickle(runs_by_sample_filename)
-        if not runs_by_sample:
-            runs_by_sample = defaultdict(list)
+    import random
+    random.seed(1)
 
-        remaining_urls = []
-        total_urls = 0
-        for n, (biome_name, runlist) in enumerate(runs_by_biome.items()):
-            for sample_url in runlist:
-                total_urls += 1
-                if sample_url not in runs_by_sample:
-                    remaining_urls.append(sample_url)
+    MAX_RUNS_PER_BIOME=50
 
-        for m, sample_url in enumerate(remaining_urls):
-            zz = get_run_info_for_runs([sample_url])
-            runs_by_sample[sample_url] = zz
+    ##
+    ## Select 50 runs per biome, at random
+    ##
 
-            if m and m % 50 == 0:
-                print(f"runinfo: {m} of {len(remaining_urls)} remaining ({total_urls} total).")
-                save_pickle(runs_by_sample, runs_by_sample_filename)
+    sub_runs_by_biome = {}
+    for biome_name in sorted(runs_by_biome):
+        runlist = list(runs_by_biome[biome_name])
+        random.shuffle(runlist)
+        sub_runs_by_biome[biome_name] = runlist[:MAX_RUNS_PER_BIOME]
 
+    ##
+    ## Now, download the runs!
+    ##
 
-                    
-    elif 0:
-        runinfo_by_biome_filename = '3-runinfo-by-biome.pickle'
-        runinfo_by_biome = read_pickle(runinfo_by_biome_filename)
-        if not runinfo_by_biome:
-            runinfo_by_biome = {}
+    runs_by_sample_filename = '3c-runs_by_sample.pickle'
+    runs_by_sample = read_pickle(runs_by_sample_filename)
+    if not runs_by_sample:
+        runs_by_sample = defaultdict(list)
 
-        for n, (biome_name, runlist) in enumerate(runs_by_biome.items()):
-            if biome_name not in runinfo_by_biome:
-                if len(runlist) > 200 and SKIP_BIG_RUNLISTS:
-                    print(runlist[:3])
-                    print(f'SKIPPING runlist for {biome_name}: {len(runlist)} runs is too many for now.')
-                    continue        # CTB SKIP BIG => outer loop.
+    remaining_urls = []
+    total_urls = 0
+    for n, (biome_name, runlist) in enumerate(sub_runs_by_biome.items()):
+        for sample_url in runlist:
+            total_urls += 1
+            if sample_url not in runs_by_sample:
+                remaining_urls.append(sample_url)
 
-                print(f"working on {biome_name} - {len(runlist)} runs")
-                zz = get_run_info_for_runs(runlist)
-                runinfo_by_biome[biome_name] = zz
+    for m, sample_url in enumerate(remaining_urls):
+        zz = get_run_info_for_runs([sample_url])
+        runs_by_sample[sample_url] = zz
 
-                # again, save each round!
-                save_pickle(runinfo_by_biome, runinfo_by_biome_filename)
+        if m and m % 50 == 0:
+            print(f"runinfo: {m} of {len(remaining_urls)} remaining ({total_urls} total).")
+            save_pickle(runs_by_sample, runs_by_sample_filename)
 
-        ##
-        ## For each biome, now parse out the information. No Web requests needed.
-        ##
+    sys.exit(0)
 
-        delme = set()
-        for biome_name, run_info in runinfo_by_biome.items():
-            for n, ri in enumerate(run_info):
-                try:
-                    for item in ri['data']:
-                        attr = item.get('attributes')
-                        #print(biome_name, attr['accession'], attr['experiment-type'], attr['instrument-platform'], attr['instrument-model'])
-                except TypeError:
-                    print(f'ERROR: biome {biome_name}, {n} entries')
-                    delme.add(biome_name)
-
-        #for name in delme:
-        #    del runinfo_by_biome[name]
-
-        #save_pickle(runinfo_by_biome, runinfo_by_biome_filename)
 
 if __name__ == '__main__':
     sys.exit(main())
