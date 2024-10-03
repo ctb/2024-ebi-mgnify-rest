@@ -10,7 +10,7 @@ import requests
 import pandas as pd
 # Data transformation
 from functools import reduce
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 TEST=False
 SKIP_BIG_RUNLISTS = True
@@ -88,6 +88,7 @@ def read_pickle(filename):
         print(f"reading from '{filename}'")
         with open(filename, 'rb') as fp:
             x = load(fp)
+            print('done!')
             return x
 
     return None
@@ -172,17 +173,22 @@ def main():
     import random
     random.seed(1)
 
-    MAX_RUNS_PER_BIOME=50
+    MAX_RUNS_PER_BIOME=1000
 
     ##
-    ## Select 50 runs per biome, at random
+    ## Select a subset of runs per biome, at random
     ##
 
     sub_runs_by_biome = {}
+    biome_runs_counter = Counter()
     for biome_name in sorted(runs_by_biome):
+        biome_runs_counter[biome_name] = len(runs_by_biome[biome_name])
         runlist = list(runs_by_biome[biome_name])
         random.shuffle(runlist)
         sub_runs_by_biome[biome_name] = runlist[:MAX_RUNS_PER_BIOME]
+
+    for biome_name, run_count in biome_runs_counter.most_common():
+        print(f"{run_count} - {biome_name}")
 
     ##
     ## Now, download the runs!

@@ -5,6 +5,7 @@ import os
 from pickle import dump, load
 from pprint import pprint
 import collections
+import csv
 
 from jsonapi_client import Session as APISession
 from jsonapi_client import Modifier
@@ -15,6 +16,13 @@ from functools import reduce
 from collections import defaultdict
 
 TEST=True
+
+
+def truncate_biome(biome, position):
+    biome = biome.split(':')
+    assert len(biome) >= position, biome
+    biome = biome[1:position]
+    return ':'.join(biome)
 
 
 def get_runs_from_samples(samples_data):
@@ -31,12 +39,14 @@ def read_pickle(filename):
         with open(filename, 'rb') as fp:
             x = load(fp)
             return x
+        print('done!')
 
     return None
 
 
 def main():
     p = argparse.ArgumentParser()
+    p.add_argument('-o', '--output-spreadsheet')
     args = p.parse_args()
 
     pd.set_option('display.max_columns', None)
@@ -87,33 +97,61 @@ def main():
         runs = get_runs_from_samples(samples_vv)
         runs_by_biome[biome_name].extend(runs)
 
-    runinfo_by_biome_filename = '3-runinfo-by-biome.pickle'
-    runinfo_by_biome = read_pickle(runinfo_by_biome_filename)
+    runs_by_sample_filename = '3c-runs_by_sample.pickle'
+    runs_by_sample = read_pickle(runs_by_sample_filename)
 
-    ##
-    ## For each biome, now parse out the information. No Web requests needed.
-    ##
+    sub_runs_by_biome = {}
+    biome_runs_counter = collections.Counter()
+    biome_illumina_counter = collections.Counter()
+    total = 0
+    total_illumina = 0
+    for biome_name, runlist in runs_by_biome.items():
+        x = []
+        for sample_url in runlist:
+            if sample_url in runs_by_sample:
+                for item in runs_by_sample[sample_url]:
+                    data = item['data']
+                    for item in data:
+                        attr = item.get('attributes')
+                        if attr['experiment-type'] == 'metagenomic' and attr['instrument-platform'] == 'ILLUMINA':
+                            print((biome_name, attr['accession'], attr['experiment-type'], attr['instrument-platform'], attr['instrument-model']))
+                    
+                            x.append((biome_name, attr['accession'], attr['experiment-type'], attr['instrument-platform'], attr['instrument-model']))
+                    total += 1
 
-    experiment_types = collections.Counter()
-    platforms = collections.Counter()
-    models = collections.Counter()
-    for biome_name, run_info in runinfo_by_biome.items():
-        for n, ri in enumerate(run_info):
-            try:
-                for item in ri['data']:
-                    attr = item.get('attributes')
-                    if attr['experiment-type'] == 'metagenomic' and attr['instrument-platform'] == 'ILLUMINA':
-                        print((biome_name, attr['accession'], attr['experiment-type'], attr['instrument-platform'], attr['instrument-model']))
-                    experiment_types[attr['experiment-type']] += 1
-                    platforms[attr['instrument-platform']] += 1
-                    models[attr['instrument-model']] += 1
-            except TypeError:
-                print(f'ERROR: biome {biome_name}, entry {n}')
+        if x:
+            sub_runs_by_biome[biome_name] = x
+            biome_runs_counter[biome_name] = len(runlist)
+            biome_illumina_counter[biome_name] = len(x)
+            total_illumina += len(x)
 
-    #pprint(experiment_types.most_common(10))
-    #pprint(platforms.most_common(5))
-    #pprint(models.most_common(5))
-    
+    print(f'found {total_illumina} total w/Illumina, of {total}')
+
+    for biome_name, ill_run_count in biome_illumina_counter.most_common():
+        run_count = biome_runs_counter[biome_name]
+        star = '*' if run_count > 200 else ''
+        print(f"{star}{ill_run_count} of {run_count} - {biome_name}")
+
+    if args.output_spreadsheet:
+        with open(args.output_spreadsheet, 'w', newline='') as fp:
+            w = csv.writer(fp)
+
+            w.writerow(['biome1', 'biome2', 'biome3',
+                       'accession', 'experiment_type',
+                       'platform', 'model'])
+
+            for biome_name, run_tuples in sub_runs_by_biome.items():
+                for rt in run_tuples:
+                    biome_name, acc, exptype, platform, model = rt
+                    w.writerow([truncate_biome(biome_name, 2),
+                                truncate_biome(biome_name, 3),
+                                truncate_biome(biome_name, 4),
+                                acc,
+                                exptype,
+                                platform,
+                                model])
+
+    sys.exit(0)
 
 
 if __name__ == '__main__':
