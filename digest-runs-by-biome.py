@@ -17,6 +17,8 @@ from collections import defaultdict
 
 TEST=True
 
+WORT_PATH="/group/ctbrowngrp/irber/data/wort-data/wort-sra/sigs/{acc}.sig"
+
 
 def truncate_biome(biome, position):
     biome = biome.split(':')
@@ -47,6 +49,7 @@ def read_pickle(filename):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('-o', '--output-spreadsheet')
+    p.add_argument('--save-sig-paths')
     args = p.parse_args()
 
     pd.set_option('display.max_columns', None)
@@ -133,23 +136,45 @@ def main():
         print(f"{star}{ill_run_count} of {run_count} - {biome_name}")
 
     if args.output_spreadsheet:
+        print(f"outputting spreadsheet to '{args.output_spreadsheet}'")
+
+        sig_path_out = None
+        if args.save_sig_paths:
+            sig_path_out = open(args.save_sig_paths, 'wt')
+
         with open(args.output_spreadsheet, 'w', newline='') as fp:
             w = csv.writer(fp)
 
             w.writerow(['biome1', 'biome2', 'biome3',
                        'accession', 'experiment_type',
-                       'platform', 'model'])
+                        'platform', 'model', 'sigpath'])
 
+            n_missing = 0
+            total_count = 0
             for biome_name, run_tuples in sub_runs_by_biome.items():
                 for rt in run_tuples:
+                    total_count += 1
                     biome_name, acc, exptype, platform, model = rt
+                    sigpath = WORT_PATH.format(acc=acc)
+                    if not os.path.exists(sigpath):
+                        sigpath = ''
+                        n_missing += 1
+                    else:
+                        if sig_path_out:
+                            sig_path_out.write(sigpath + "\n")
+
                     w.writerow([truncate_biome(biome_name, 2),
                                 truncate_biome(biome_name, 3),
                                 truncate_biome(biome_name, 4),
                                 acc,
                                 exptype,
                                 platform,
-                                model])
+                                model,
+                                sigpath])
+
+            print(f"of {total_count} rows, {n_missing} missing sig files.")
+            if sig_path_out:
+                print(f"wrote {total_count - n_missing} sig paths to '{args.save_sig_paths}'")
 
     sys.exit(0)
 
